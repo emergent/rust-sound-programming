@@ -1,0 +1,7 @@
+[package]
+name = "sound_lib"
+version = "0.1.0"
+authors = ["emergent <d96a28f1649282948ebf2c27697a16d040d53026>"]
+edition = "2018"
+
+[dependencies]
