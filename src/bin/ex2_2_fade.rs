@@ -1,6 +1,21 @@
+extern crate gnuplot;
 extern crate sound_lib;
+use gnuplot::{Caption, Color, Figure};
 use sound_lib::MonoPcm;
 use std::f64::consts::PI;
+
+fn plot(data: &Vec<f64>, filename: &str, caption: &str) {
+    let x = (0..data.len() as u32).collect::<Vec<u32>>();
+    let mut fg = Figure::new();
+    let range = 2000;
+    fg.axes2d().lines(
+        &x[0..range],
+        &data[0..range],
+        &[Caption(caption), Color("blue")],
+    );
+    fg.set_terminal("png", filename);
+    fg.show();
+}
 
 fn sine_wave(pcm: &mut MonoPcm, f0: f64, a: f64, offset: u32, duration: u32) {
     for n in 0..duration {
@@ -41,5 +56,6 @@ fn main() {
         sine_wave(&mut pcm, f0, a, offset_base * (i as u32), duration);
     }
 
+    plot(&pcm.sound_data, "ex2_2.png", "sine wave");
     pcm.write_to("ex2_2.wav").ok();
 }
