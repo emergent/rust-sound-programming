@@ -18,4 +18,6 @@ fn main() {
     println!("block_size:      \t{}", pcm0.block_size);
     println!("bits_per_sample: \t{}", pcm0.bits_per_sample);
     println!("data_chunk_size: \t{}", pcm0.data_chunk_size);
+
+    pcm0.write_to("b.wav").unwrap();
 }

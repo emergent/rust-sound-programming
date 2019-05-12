@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, BufWriter, Read, Write};
 
 pub struct MonoPcm {
     pub fs: u32,
@@ -25,7 +25,7 @@ impl MonoPcm {
         let mut data = Vec::new();
         reader.read_exact(&mut buf_header)?;
 
-        Self::print_bytes(&buf_header, true);
+        Self::print_bytes(&buf_header, false);
 
         let riff_chunk_size = Self::bytes_to_u32(&buf_header[4..8]);
         let fmt_chunk_size = Self::bytes_to_u32(&buf_header[16..20]);
@@ -38,16 +38,16 @@ impl MonoPcm {
         let data_chunk_size = Self::bytes_to_u32(&buf_header[40..44]);
 
         let mut buf = [0; 65536];
+        let normalize_base = 2_u16.pow((bits_per_sample - 1).into()) as f64;
         loop {
             let size = reader.read(&mut buf)?;
             if size == 0 {
                 break;
             }
-            //Self::print_bytes(&buf[..size], false);
 
             for i in 0..size / 2 {
-                let chunk = (buf[i * 2 + 1] as u16) << 8 | (buf[i * 2] as u16);
-                data.push((chunk as f64) / 32768.0);
+                let chunk = ((buf[i * 2 + 1] as u16) << 8 | (buf[i * 2] as u16)) as i16;
+                data.push((chunk as f64) / normalize_base);
             }
         }
 
@@ -66,6 +66,62 @@ impl MonoPcm {
             bits_per_sample,
             data_chunk_size,
         })
+    }
+
+    pub fn write_to(&self, filename: &str) -> Result<(), std::io::Error> {
+        let mut writer = BufWriter::new(File::create(filename)?);
+
+        //Self::str_to_bytes(&mut buf_header[0..4], "RIFF");
+        writer.write(b"RIFF")?;
+        writer.write(&Self::u32_to_bytes(36 + self.length * 2))?;
+        writer.write(b"WAVEfmt ")?;
+        writer.write(&Self::u32_to_bytes(16))?; // fmt_chunk_size
+        writer.write(&Self::u16_to_bytes(1))?; // wave_format_type
+        writer.write(&Self::u16_to_bytes(1))?; // channel
+        writer.write(&Self::u32_to_bytes(self.fs))?; // sample_per_sec
+        writer.write(&Self::u32_to_bytes(self.fs * self.bits as u32 / 8))?; // bytes_per_sec
+        writer.write(&Self::u16_to_bytes(self.bits / 8))?; // block_size
+        writer.write(&Self::u16_to_bytes(self.bits))?; // bits_per_sample
+        writer.write(b"data")?;
+        writer.write(&Self::u32_to_bytes(self.length * 2))?; // bits_per_sample
+
+        for data in self
+            .sound_data
+            .iter()
+            .map(|f| {
+                let s = match (f + 1.0) / 2.0 * 65536.0 {
+                    s if s > 65535.0 => 65535.0,
+                    s if s < 0.0 => 0.0,
+                    s => s,
+                };
+                ((s + 0.5) as i32 - 32768) as i16
+            })
+            .map(|s| Self::i16_to_bytes(s))
+        {
+            writer.write(&data)?;
+        }
+
+        Ok(())
+    }
+
+    fn u32_to_bytes(u: u32) -> [u8; 4] {
+        let mut bytes = [0u8; 4];
+        bytes[0] = u as u8;
+        bytes[1] = (u >> 8) as u8;
+        bytes[2] = (u >> 16) as u8;
+        bytes[3] = (u >> 24) as u8;
+        bytes
+    }
+
+    fn u16_to_bytes(u: u16) -> [u8; 2] {
+        let mut bytes = [0u8; 2];
+        bytes[0] = u as u8;
+        bytes[1] = (u >> 8) as u8;
+        bytes
+    }
+
+    fn i16_to_bytes(i: i16) -> [u8; 2] {
+        Self::u16_to_bytes(i as u16)
     }
 
     fn bytes_to_u32(bytes: &[u8]) -> u32 {
