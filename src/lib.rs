@@ -1,12 +1,13 @@
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 
+#[derive(Default)]
 pub struct MonoPcm {
     pub fs: u32,
     pub bits: u16,
     pub length: u32,
     pub sound_data: Vec<f64>,
-
+    // for debug
     pub riff_chunk_size: u32,
     pub fmt_chunk_size: u32,
     pub wave_format_type: u16,
